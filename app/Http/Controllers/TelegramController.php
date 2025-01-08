@@ -21,6 +21,11 @@ class TelegramController extends Controller
         return view('telegram.sendMessageWithFile');
     }
 
+    public function indexSelection()
+    {
+        return view('telegram.sendMessageBySelection');
+    }
+
     /**
      * Show the form for creating a new resource.
      */
@@ -130,7 +135,7 @@ class TelegramController extends Controller
             }
         }
 
-        $chatId = '743745215'; 
+        $chatId = '743745215';
         $text = $data['text'];
 
         try {
@@ -160,11 +165,31 @@ class TelegramController extends Controller
                 ]);
             }
         } catch (\Exception $e) {
-            return back()->with('danger','A problem occured!');
+            return back()->with('danger', 'A problem occured!');
         }
 
-        return back()->with('success','Message send with a message');
+        return back()->with('success', 'Message send with a message');
     }
+
+    public function sendMessageBySelecting(Request $request)
+    {
+        $data = $request->validate([
+            'names' => 'required|array|min:1',
+            'names.*' => 'string'
+        ]);
+        $token = 'https://api.telegram.org/bot7552280930:AAHKxj0v2bVLh_mbHJLE66FjwI3mXkER9q4';
+
+        $nameList = implode("\n", $data['names']);
+
+        $response = Http::post($token . '/sendMessage', [
+            'parse_mode' => 'HTML',
+            'chat_id' => '743745215',
+            'text' => "Selected Users:\n" . $nameList
+        ]);
+
+        return back()->with('success', 'Message sent');
+    }
+
 
     /**
      * Display the specified resource.
