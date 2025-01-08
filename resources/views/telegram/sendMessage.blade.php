@@ -14,13 +14,13 @@
     <div class="container mt-3">
         <div class="row">
             <div class="col-12 mt-3">
-                <h2>Telegram Bot</h2>
+                <h2>Telegram Bot only Message</h2>
                 @if (session('success'))
                     <div class="alert alert-success">
                         {{ session('success') }}
                     </div>
                 @endif
-                <form action="{{ route('telegram.send') }}" method="post">
+                <form action="{{ route('telegram.sendMessage') }}" method="post">
                     @csrf
                     <input type="text" class="form-control" placeholder="Text" name="text">
                     <button class="btn btn-primary mt-3">Send</button>

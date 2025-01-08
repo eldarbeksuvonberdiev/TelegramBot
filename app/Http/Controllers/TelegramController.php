@@ -13,7 +13,12 @@ class TelegramController extends Controller
      */
     public function index()
     {
-        return view('telegram.index');
+        return view('telegram.sendMessage');
+    }
+
+    public function indexFile()
+    {
+        return view('telegram.sendMessageWithFile');
     }
 
     /**
@@ -87,6 +92,11 @@ class TelegramController extends Controller
         ]);
 
         return back()->with('success', 'Message sent');
+    }
+
+    public function sendMessageWithFile(Request $request)
+    {
+        dd($request->all());
     }
 
     /**
