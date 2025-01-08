@@ -20,6 +20,11 @@
                         {{ session('success') }}
                     </div>
                 @endif
+                @if (session('danger'))
+                    <div class="alert alert-danger">
+                        {{ session('success') }}
+                    </div>
+                @endif
                 <form action="{{ route('telegram.sendMessageWithFile') }}" method="post" enctype="multipart/form-data">
                     @csrf
                     <input type="text" class="form-control" placeholder="Text" name="text">

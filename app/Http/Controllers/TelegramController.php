@@ -96,7 +96,74 @@ class TelegramController extends Controller
 
     public function sendMessageWithFile(Request $request)
     {
-        dd($request->all());
+        $data = $request->validate([
+            'text' => 'required|string',
+            'file' => 'file'
+        ]);
+
+        $token = 'https://api.telegram.org/bot7552280930:AAHKxj0v2bVLh_mbHJLE66FjwI3mXkER9q4';
+
+        $filePath = null;
+        $extension = null;
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $extension = $file->getClientOriginalExtension();
+            $filename = now()->format('Y-m-d_H-i-s') . '_' . time() . '.' . $extension;
+
+            switch ($extension) {
+                case 'jpg':
+                case 'png':
+                case 'jpeg':
+                    $filePath = $file->move('images/', $filename);
+                    break;
+
+                case 'mp4':
+                case 'avi':
+                case 'mkv':
+                    $filePath = $file->move('videos/', $filename);
+                    break;
+
+                default:
+                    $filePath = $file->move('files/', $filename);
+                    break;
+            }
+        }
+
+        $chatId = '743745215'; 
+        $text = $data['text'];
+
+        try {
+            if ($filePath && in_array($extension, ['jpg', 'png', 'jpeg'])) {
+                Http::attach('photo', fopen(public_path($filePath), 'r'))
+                    ->post($token . '/sendPhoto', [
+                        'chat_id' => $chatId,
+                        'caption' => $text,
+                    ]);
+            } elseif ($filePath && in_array($extension, ['mp4', 'avi', 'mkv'])) {
+                Http::attach('video', fopen(public_path($filePath), 'r'))
+                    ->post($token . '/sendVideo', [
+                        'chat_id' => $chatId,
+                        'caption' => $text,
+                    ]);
+            } elseif ($filePath) {
+                Http::attach('document', fopen(public_path($filePath), 'r'))
+                    ->post($token . '/sendDocument', [
+                        'chat_id' => $chatId,
+                        'caption' => $text,
+                    ]);
+            } else {
+                Http::post($token . '/sendMessage', [
+                    'chat_id' => $chatId,
+                    'text' => $text,
+                    'parse_mode' => 'HTML',
+                ]);
+            }
+        } catch (\Exception $e) {
+            return back()->with('danger','A problem occured!');
+        }
+
+        return back()->with('success','Message send with a message');
     }
 
     /**
