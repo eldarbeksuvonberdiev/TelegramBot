@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class TelegramController extends Controller
 {
@@ -221,5 +222,35 @@ class TelegramController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+
+    public function sendReverse(Request $request)
+    {
+        try {
+            $data = $request->all();
+            $chat_id = $data['message']['chat']['id'];
+            $text = $data['message']['text'];
+            Log::info('Telegram: ', $data);
+            $this->sendReverseMessage($text, $chat_id);
+
+            return response()->json([
+                'status' => 'success'
+            ], 200);
+        } catch (\Throwable $th) {
+            throw $th;
+        }
+    }
+
+    public function sendReverseMessage(string $text, int $chat_id)
+    {
+        $token = 'https://api.telegram.org/bot7552280930:AAHKxj0v2bVLh_mbHJLE66FjwI3mXkER9q4';
+
+        $response = Http::post($token . '/sendMessage', [
+            'parse_mode' => 'HTML',
+            'chat_id' => $chat_id,
+            'text' => "<b>{$text}</b>",
+        ]);
+
+        return back()->with('success', 'Message sent');
     }
 }
