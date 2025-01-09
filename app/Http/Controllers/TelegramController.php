@@ -229,7 +229,6 @@ class TelegramController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
-        // Handle user registration steps
         $step = cache()->get("registration_step_{$chatId}", 'start');
 
         switch ($step) {
@@ -262,20 +261,18 @@ class TelegramController extends Controller
                     break;
                 }
 
-                $photo = end($update['message']['photo']); // Get highest resolution photo
+                $photo = end($update['message']['photo']);
                 $fileId = $photo['file_id'];
                 $fileInfo = $this->getFile($fileId);
                 $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$fileInfo['result']['file_path']}";
 
-                // Save the photo locally
                 $photoPath = public_path("profile_pictures/{$chatId}.jpg");
                 file_put_contents($photoPath, file_get_contents($fileUrl));
 
-                // Store user data
                 $name = cache()->get("user_name_{$chatId}");
                 $email = cache()->get("user_email_{$chatId}");
                 $password = cache()->get("user_password_{$chatId}");
-                // Save to database (example)
+
                 User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password), 'photo' => $photoPath, 'chat_id' => $chatId]);
 
                 $this->sendMessage($chatId, "Registration complete!\nName: $name\nEmail: $email\nPhoto saved.");
