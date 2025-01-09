@@ -3,15 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class TelegramController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+
+    private $telegramApiUrl;
+    private $botToken;
+
+    public function __construct()
+    {
+        $this->botToken = env('TELEGRAM_BOT_TOKEN');
+        $this->telegramApiUrl = "https://api.telegram.org/bot{$this->botToken}/";
+    }
+
     public function index()
     {
         return view('telegram.sendMessage');
@@ -27,17 +36,6 @@ class TelegramController extends Controller
         return view('telegram.sendMessageBySelection');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -191,39 +189,6 @@ class TelegramController extends Controller
         return back()->with('success', 'Message sent');
     }
 
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
-
     public function sendReverse(Request $request)
     {
         try {
@@ -252,5 +217,92 @@ class TelegramController extends Controller
         ]);
 
         return back()->with('success', 'Message sent');
+    }
+
+    public function handle(Request $request)
+    {
+        $update = $request->all();
+        $chatId = $update['message']['chat']['id'] ?? null;
+        $text = $update['message']['text'] ?? null;
+
+        if (!$chatId || !$text) {
+            return response()->json(['status' => 'ignored']);
+        }
+
+        // Handle user registration steps
+        $step = cache()->get("registration_step_{$chatId}", 'start');
+
+        switch ($step) {
+            case 'start':
+                $this->sendMessage($chatId, "Welcome! Please enter your name:");
+                cache()->put("registration_step_{$chatId}", 'name');
+                break;
+
+            case 'name':
+                cache()->put("user_name_{$chatId}", $text);
+                $this->sendMessage($chatId, "Great! Now, please enter your email:");
+                cache()->put("registration_step_{$chatId}", 'email');
+                break;
+
+            case 'email':
+                cache()->put("user_email_{$chatId}", $text);
+                $this->sendMessage($chatId, "Thanks! Please enter your password:");
+                cache()->put("registration_step_{$chatId}", 'password');
+                break;
+
+            case 'password':
+                cache()->put("user_password_{$chatId}", $text);
+                $this->sendMessage($chatId, "Almost done! Please send your profile picture:");
+                cache()->put("registration_step_{$chatId}", 'image');
+                break;
+
+            case 'image':
+                if (!isset($update['message']['photo'])) {
+                    $this->sendMessage($chatId, "Please send a valid photo.");
+                    break;
+                }
+
+                $photo = end($update['message']['photo']); // Get highest resolution photo
+                $fileId = $photo['file_id'];
+                $fileInfo = $this->getFile($fileId);
+                $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$fileInfo['result']['file_path']}";
+
+                // Save the photo locally
+                $photoPath = public_path("profile_pictures/{$chatId}.jpg");
+                file_put_contents($photoPath, file_get_contents($fileUrl));
+
+                // Store user data
+                $name = cache()->get("user_name_{$chatId}");
+                $email = cache()->get("user_email_{$chatId}");
+                $password = cache()->get("user_password_{$chatId}");
+                // Save to database (example)
+                User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password), 'photo' => $photoPath, 'chat_id' => $chatId]);
+
+                $this->sendMessage($chatId, "Registration complete!\nName: $name\nEmail: $email\nPhoto saved.");
+                cache()->forget("registration_step_{$chatId}");
+                break;
+
+            default:
+                $this->sendMessage($chatId, "Unknown step. Type /start to begin again.");
+                cache()->forget("registration_step_{$chatId}");
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    private function sendMessage($chatId, $text)
+    {
+        $url = $this->telegramApiUrl . "sendMessage";
+        Http::post($url, [
+            'chat_id' => $chatId,
+            'text' => $text,
+        ]);
+    }
+
+    private function getFile($fileId)
+    {
+        $url = $this->telegramApiUrl . "getFile";
+        $response = Http::post($url, ['file_id' => $fileId]);
+        return $response->json();
     }
 }
