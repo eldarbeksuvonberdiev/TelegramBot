@@ -27,11 +27,13 @@ class TelegramRegistrationConstroller extends Controller
 
     public function handle(Request $request)
     {
+        Log::info($request->all());
         $update = $request->all();
         $chatId = $update['message']['chat']['id'] ?? null;
         $text = $update['message']['text'] ?? null;
-        $photoArr = end($update['message']['photo']) ?? null;
-        if ($photoArr) {
+        
+        if (isset($update['message']['photo'])) {
+            $photoArr = end($update['message']['photo']) ?? null;
             $photoInfo = $this->getFile($photoArr['file_id']);
             $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$photoInfo['result']['file_path']}";
             $uniqId = uniqid();
@@ -40,15 +42,13 @@ class TelegramRegistrationConstroller extends Controller
             file_put_contents($photoPath, $fileContent);
         }
 
-        Log::info([$update,$photoInfo,$photoPath,'Message Keldi']);
+
+
 
         if (!$chatId || !$text) {
             return response()->json(['status' => 'ignored']);
         }
         $step = cache()->get("registration_step_{$chatId}", 'start');
-
-        Log::info([$update, $chatId, $text, $step, "Munda 4 narsa bo"]);
-        $this->sendMessage($chatId, 'Nagap');
 
         switch ($step) {
             case 'start':
