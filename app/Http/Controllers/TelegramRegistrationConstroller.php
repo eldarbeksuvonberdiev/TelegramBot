@@ -30,7 +30,17 @@ class TelegramRegistrationConstroller extends Controller
         $update = $request->all();
         $chatId = $update['message']['chat']['id'] ?? null;
         $text = $update['message']['text'] ?? null;
-        Log::info([$update,'Message Keldi']);
+        $photoArr = end($update['message']['photo']) ?? null;
+        if ($photoArr) {
+            $photoInfo = $this->getFile($photoArr['file_id']);
+            $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$photoInfo['result']['file_path']}";
+            $uniqId = uniqid();
+            $photoPath = public_path("images/{$uniqId}.jpg");
+            $fileContent = file_get_contents($fileUrl);
+            file_put_contents($photoPath, $fileContent);
+        }
+
+        Log::info([$update,$photoInfo,$photoPath,'Message Keldi']);
 
         if (!$chatId || !$text) {
             return response()->json(['status' => 'ignored']);
@@ -79,7 +89,7 @@ class TelegramRegistrationConstroller extends Controller
                 $fileId = $photo['file_id'];
                 $fileInfo = $this->getFile($fileId);
 
-                Log::info([$photo, 'FileInfo']);
+                // Log::info([$photo, 'FileInfo']);
 
                 if (!$fileInfo || !isset($fileInfo['result']['file_path'])) {
                     $this->sendMessage($chatId, "Failed to retrieve file information. Please try again.");
