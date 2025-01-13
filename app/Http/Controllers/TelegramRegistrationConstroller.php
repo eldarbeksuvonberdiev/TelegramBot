@@ -32,6 +32,56 @@ class TelegramRegistrationConstroller extends Controller
 
         $userOnRequest = User::where('chat_id', $chatId)->first();
 
+        if (isset($userOnRequest) && $userOnRequest->role == 'admin') {
+
+            if ($text == 'Active' || $text == 'Inactive') {
+
+                switch ($text) {
+                    case 'Active':
+                        $activeUsers = User::where('status', 1)->get();
+                        Log::info($activeUsers);
+                        foreach ($activeUsers as $activeUser) {
+                            Http::post($this->telegramApiUrl . 'sendMessage', [
+                                'chat_id' => $chatId,
+                                'text' => "
+                                    $activeUser->name,
+                                    $activeUser->email,
+                                "
+                            ]);
+                        }
+                        break;
+                    case 'Inactive':
+                        $inActiveUsers = User::where('status', 0)->where('role', '!=', 'admin')->get();
+                        Log::info($inActiveUsers);
+                        foreach ($inActiveUsers as $inActiveUser) {
+                            Http::post($this->telegramApiUrl . 'sendMessage', [
+                                'chat_id' => $chatId,
+                                'text' => "
+                                    $inActiveUser->name,
+                                    $inActiveUser->email,
+                                "
+                            ]);
+                        }
+                        break;
+                }
+            } else {
+                // Log::info("'elsedaman'");
+                Http::post($this->telegramApiUrl . 'sendMessage', [
+                    'chat_id' => $chatId,
+                    'reply_markup' => json_encode([
+                        'keyboard' => [
+                            [
+                                ['text' => 'Active', 'callback_data' => "approve:$chatId"],
+                                ['text' => 'Inactive', 'callback_data' => "approve:$chatId"],
+                            ]
+                        ],
+                        'resize_keyboard' => true,
+                    ]),
+                ]);
+                return;
+            }
+        }
+
         if (!$userOnRequest) {
             $step = cache()->get("registration_step_{$chatId}", 'start');
 
@@ -45,7 +95,7 @@ class TelegramRegistrationConstroller extends Controller
                 $fileContent = file_get_contents($fileUrl);
                 file_put_contents($photoPath, $fileContent);
 
-                cache()->put("photo_path_{$chatId}", $photoPath);
+                cache()->put("photo_path_{$chatId}", "images/$uniqId");
 
                 $this->sendMessage($chatId, "Please, enter the verification code!");
 
@@ -79,7 +129,7 @@ class TelegramRegistrationConstroller extends Controller
 
                 case 'email':
                     cache()->put("user_email_{$chatId}", $text);
-                    $this->sendMessage($chatId, "Thanks! Please enter your password:");
+                    $this->sendMessage($chatId, "Thanks! Please enter password for this app:");
                     cache()->put("registration_step_{$chatId}", 'password');
                     // $email = cache()->get("user_name_{$chatId}", $text);
                     // Log::info($email);
@@ -169,23 +219,52 @@ class TelegramRegistrationConstroller extends Controller
                         $email = cache()->get("user_email_{$chatId}");
                         $password = cache()->get("user_password_{$chatId}");
                         $photoPath = cache()->get("photo_path_{$chatId}");
-                        User::create([
+                        $user = User::create([
                             'name' => $name,
                             'email' => $email,
-                            'email_verified_at' => now()->format("Y-m-d H-i-s"), 
                             'password' => Hash::make($password),
                             'image' => $photoPath,
                             'chat_id' => $chatId
                         ]);
+                        $time = now()->format('l, jS F Y h:i A');;
+                        User::where('id', $user->id)->update([
+                            'email_verified_at' => now()->format("Y-m-d H-i-s")
+                        ]);
 
-                        $this->sendMessage($chatId, "Your account has been created! :)");
+                        $admins = User::where('role', 'admin')->get();
+                        foreach ($admins as $admin) {
+                            Http::post($this->telegramApiUrl . 'sendMessage', [
+                                'parse_mode' => 'HTML',
+                                'chat_id' => $admin->chat_id,
+                                'text' => "
+                                    <pre>
+                                    'name' => $user->name,
+                                    'email' => $user->email
+                                    </pre>
+                                ",
+                                'reply_markup' => json_encode([
+                                    'keyboard' => [
+                                        [
+                                            ['text' => 'Accept ✅', 'callback_data' => "approve:$chatId"],
+                                            ['text' => 'Reject ⛔️', 'callback_data' => "approve:$chatId"],
+                                        ]
+                                    ],
+                                    'resize_keyboard' => true,
+                                    // 'one_time_keyboard' => true,
+                                ]),
+                            ]);
+                        }
+
+                        $this->sendMessage($chatId, "Your account has been created at $time! :)");
                         cache()->forget("registration_step_{$chatId}");
+                        break;
                     } else {
-                        $this->sendMessage($chatId, "The code is not correct!");
+                        $this->sendMessage($chatId, "The code is not correct and sent to your email again");
+                        $email = cache()->get("user_email_{$chatId}");
+                        SendVerificationCode::dispatch($email, cache()->get("email_virification_code_{$chatId}"));
                         break;
                     }
 
-                    break;
                 default:
                     $this->sendMessage($chatId, "Unknown step. Type /start to begin again.");
                     cache()->forget("registration_step_{$chatId}");
@@ -193,8 +272,6 @@ class TelegramRegistrationConstroller extends Controller
 
 
             return response()->json(['status' => 'success']);
-        } else {
-            $this->sendMessage($chatId, "You have an account in this bot! :)");
         }
     }
 
@@ -315,15 +392,6 @@ class TelegramRegistrationConstroller extends Controller
 
         return json_decode($response, true);
     }
-
-
-
-
-
-
-
-
-
 
 
 
