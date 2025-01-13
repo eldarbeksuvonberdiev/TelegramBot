@@ -17,12 +17,10 @@ class TelegramRegistrationConstroller extends Controller
 
 
     private $telegramApiUrl;
-    private $botToken;
 
     public function __construct()
     {
-        $this->botToken = env('TELEGRAM_BOT_TOKEN');
-        $this->telegramApiUrl = "https://api.telegram.org/bot{$this->botToken}/";
+        $this->telegramApiUrl = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN') . "/";
     }
 
 
@@ -41,11 +39,14 @@ class TelegramRegistrationConstroller extends Controller
 
                 $photoArr = end($update['message']['photo']) ?? null;
                 $photoInfo = $this->getFile($photoArr['file_id']);
-                $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$photoInfo['result']['file_path']}";
+                $fileUrl = "https://api.telegram.org/file/bot" . env('TELEGRAM_BOT_TOKEN') . "/{$photoInfo['result']['file_path']}";
                 $uniqId = uniqid();
                 $photoPath = public_path("images/{$uniqId}.jpg");
                 $fileContent = file_get_contents($fileUrl);
                 file_put_contents($photoPath, $fileContent);
+
+                cache()->put("photo_path_{$chatId}", $photoPath);
+
                 $this->sendMessage($chatId, "Please, enter the verification code!");
 
                 cache()->put("registration_step_{$chatId}", 'email_verification');
@@ -53,19 +54,9 @@ class TelegramRegistrationConstroller extends Controller
                 $rand = rand(10000, 100000);
                 cache()->put("email_virification_code_{$chatId}", $rand);
 
-                $name = cache()->get("user_name_{$chatId}");
                 $email = cache()->get("user_email_{$chatId}");
-                $password = cache()->get("user_password_{$chatId}");
 
                 SendVerificationCode::dispatch($email, $rand);
-
-                User::create([
-                    'name' => $name,
-                    'email' => $email,
-                    'password' => Hash::make($password),
-                    'image' => $photoPath,
-                    'chat_id' => $chatId
-                ]);
             }
 
             if (!$chatId || !$text) {
@@ -172,10 +163,22 @@ class TelegramRegistrationConstroller extends Controller
                 case 'email_verification':
                     $code = cache()->get("email_virification_code_{$chatId}");
                     if ($code == $text) {
-                        User::where('chat_id', $chatId)->update([
-                            'email_verified_at' => now()->format("Y-m-d H:i:s")
+
+
+                        $name = cache()->get("user_name_{$chatId}");
+                        $email = cache()->get("user_email_{$chatId}");
+                        $password = cache()->get("user_password_{$chatId}");
+                        $photoPath = cache()->get("photo_path_{$chatId}");
+                        User::create([
+                            'name' => $name,
+                            'email' => $email,
+                            'email_verified_at' => now()->format("Y-m-d H-i-s"), 
+                            'password' => Hash::make($password),
+                            'image' => $photoPath,
+                            'chat_id' => $chatId
                         ]);
-                        $this->sendMessage($chatId, "Your email has been verified! :)");
+
+                        $this->sendMessage($chatId, "Your account has been created! :)");
                         cache()->forget("registration_step_{$chatId}");
                     } else {
                         $this->sendMessage($chatId, "The code is not correct!");
@@ -214,6 +217,107 @@ class TelegramRegistrationConstroller extends Controller
 
 
 
+    public function handleWebhook(Request $request)
+    {
+        $update = $request->all();
+
+        // Check if the update contains a message
+        if (isset($update['message'])) {
+            $this->handleMessage($update['message']);
+        }
+
+        // Check if the update contains a callback query
+        if (isset($update['callback_query'])) {
+            $this->handleCallbackQuery($update['callback_query']);
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    // Handle a message
+    private function handleMessage($message)
+    {
+        $chatId = $message['chat']['id'];
+        $text = $message['text'];
+
+        if ($text === '/register') {
+            $employeeName = $message['from']['first_name'];
+            $admins = [12345678, 87654321]; // Replace with admin IDs
+
+            foreach ($admins as $adminId) {
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => 'Approve', 'callback_data' => "approve:$chatId"],
+                            ['text' => 'Reject', 'callback_data' => "reject:$chatId"],
+                        ],
+                    ],
+                ];
+
+                $this->sendMessageTo($adminId, "New employee request:\nName: $employeeName", $keyboard);
+            }
+        }
+    }
+
+    // Handle a callback query
+    private function handleCallbackQuery($callbackQuery)
+    {
+        $data = $callbackQuery['data'];
+        $callbackId = $callbackQuery['id'];
+
+        list($action, $employeeChatId) = explode(':', $data);
+
+        if ($action === 'approve') {
+            $this->sendMessageTo($employeeChatId, "Your registration has been approved!");
+            $this->answerCallbackQuery($callbackId, "Employee approved!");
+        } elseif ($action === 'reject') {
+            $this->sendMessageTo($employeeChatId, "Your registration has been rejected.");
+            $this->answerCallbackQuery($callbackId, "Employee rejected!");
+        }
+    }
+
+    // Send a message to a chat
+    private function sendMessageTo($chatId, $text, $keyboard = null)
+    {
+        $url = $this->telegramApiUrl . 'sendMessage';
+        $data = [
+            'chat_id' => $chatId,
+            'text' => $text,
+            'reply_markup' => $keyboard ? json_encode($keyboard) : null,
+        ];
+
+        $this->sendRequest($url, $data);
+    }
+
+    // Respond to a callback query
+    private function answerCallbackQuery($callbackQueryId, $text)
+    {
+        $url = $this->telegramApiUrl . 'answerCallbackQuery';
+        $data = [
+            'callback_query_id' => $callbackQueryId,
+            'text' => $text,
+        ];
+
+        $this->sendRequest($url, $data);
+    }
+
+    // Send a POST request to the Telegram API
+    private function sendRequest($url, $data)
+    {
+        $curl = curl_init();
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_POST, true);
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($curl);
+        curl_close($curl);
+
+        return json_decode($response, true);
+    }
+
+
+
 
 
 
@@ -225,7 +329,7 @@ class TelegramRegistrationConstroller extends Controller
 
     public function store(int $chatId, string $text, $replyMarkup = null)
     {
-        $token = "https://api.telegram.org/bot" . $this->botToken;
+        $token = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN');
         $payload = [
             'chat_id' => $chatId,
             'text' => $text,
