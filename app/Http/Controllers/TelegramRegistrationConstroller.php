@@ -23,60 +23,113 @@ class TelegramRegistrationConstroller extends Controller
         $this->telegramApiUrl = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN') . "/";
     }
 
+    private function answerCallbackQuery($callbackQueryId, $text)
+    {
+        $url = $this->telegramApiUrl . 'answerCallbackQuery';
+        $data = [
+            'callback_query_id' => $callbackQueryId,
+            'text' => $text,
+        ];
+
+        $this->sendRequest($url, $data);
+    }
+
+    private function sendRequest($url, $data)
+    {
+        $response = Http::post($url, $data);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        Log::error("HTTP request failed", [
+            'url' => $url,
+            'data' => $data,
+            'response' => $response->body(),
+        ]);
+
+        return null;
+    }
 
     public function handle(Request $request)
     {
         $update = $request->all();
-        $chatId = $update['message']['chat']['id'] ?? null;
+        if (isset($update['message']['chat']['id'])) {
+            $chatId = $update['message']['chat']['id'] ?? null;
+        } else {
+            $chatId = $update['callback_query']['message']['chat']['id'] ?? null;
+        }
         $text = $update['message']['text'] ?? null;
 
         $userOnRequest = User::where('chat_id', $chatId)->first();
 
         if (isset($userOnRequest) && $userOnRequest->role == 'admin') {
 
-            if ($text == 'Active' || $text == 'Inactive') {
+            Log::info([$update, $chatId]);
 
-                switch ($text) {
-                    case 'Active':
-                        $activeUsers = User::where('status', 1)->get();
-                        Log::info($activeUsers);
-                        foreach ($activeUsers as $activeUser) {
-                            Http::post($this->telegramApiUrl . 'sendMessage', [
-                                'chat_id' => $chatId,
-                                'text' => "
-                                    {$activeUser->name}\n{$activeUser->email}\n
-                                "
-                            ]);
-                        }
-                        break;
-                    case 'Inactive':
-                        $inActiveUsers = User::where('status', 0)->where('role', '!=', 'admin')->get();
-                        Log::info($inActiveUsers);
-                        foreach ($inActiveUsers as $inActiveUser) {
-                            Http::post($this->telegramApiUrl . 'sendMessage', [
-                                'chat_id' => $chatId,
-                                'text' => "
-                                    {$inActiveUser->name}\n{$inActiveUser->email}\n
-                                "
-                            ]);
-                        }
-                        break;
+            if (isset($update['callbeck_query'])) {
+                $callbackId = $update['callback_query']['id'];
+                list($action, $employeeChatId) = explode(':', $update['callback_query']);
+                if ($action === 'accept') {
+                    User::where('chat_id', $employeeChatId)->update('status', 1);
+                    $this->sendMessage($employeeChatId, "Your registration has been approved!");
+                    $this->answerCallbackQuery($callbackId, "Employee approved!");
+                } elseif ($action === 'reject') {
+                    User::where('chat_id', $employeeChatId)->update('status', 0);
+                    $this->sendMessage($employeeChatId, "Your registration has been rejected.");
+                    $this->answerCallbackQuery($callbackId, "Employee rejected!");
                 }
             } else {
-                Http::post($this->telegramApiUrl . 'sendMessage', [
-                    'chat_id' => $chatId,
-                    'text' => 'Please choose an option below:',
-                    'reply_markup' => json_encode([
-                        'keyboard' => [
-                            [
-                                ['text' => 'Active'],
-                                ['text' => 'Inactive'],
-                            ]
-                        ],
-                        'resize_keyboard' => true,
-                    ]),
-                ]);
-                return;
+                if ($text == 'Active' || $text == 'Inactive') {
+
+                    switch ($text) {
+                        case 'Active':
+                            $activeUsers = User::where('status', 1)->get();
+                            foreach ($activeUsers as $activeUser) {
+                                Http::post($this->telegramApiUrl . 'sendMessage', [
+                                    'chat_id' => $chatId,
+                                    'text' => "{$activeUser->name}\n{$activeUser->email}\n",
+                                    'reply_markup' => json_encode([
+                                        'inline_keyboard' => [
+                                            [
+                                                ['text' => 'Accept ✅', 'callback_data' => "accept:{$chatId}"],
+                                                ['text' => 'Reject ❌', 'callback_data' => "reject:{$chatId}"],
+                                            ]
+                                        ],
+                                        'resize_keyboard' => true,
+                                        // 'one_time_keyboard' => true,
+                                    ]),
+                                ]);
+                            }
+                            break;
+                        case 'Inactive':
+                            $inActiveUsers = User::where('status', 0)->where('role', '!=', 'admin')->get();
+                            foreach ($inActiveUsers as $inActiveUser) {
+                                Http::post($this->telegramApiUrl . 'sendMessage', [
+                                    'chat_id' => $chatId,
+                                    'text' => "
+                                        {$inActiveUser->name}\n{$inActiveUser->email}\n
+                                    "
+                                ]);
+                            }
+                            break;
+                    }
+                } else {
+                    Http::post($this->telegramApiUrl . 'sendMessage', [
+                        'chat_id' => $chatId,
+                        'text' => 'Please choose an option below:',
+                        'reply_markup' => json_encode([
+                            'keyboard' => [
+                                [
+                                    ['text' => 'Active'],
+                                    ['text' => 'Inactive'],
+                                ]
+                            ],
+                            'resize_keyboard' => true,
+                        ]),
+                    ]);
+                    return;
+                }
             }
         }
 
@@ -234,9 +287,7 @@ class TelegramRegistrationConstroller extends Controller
                             Http::post($this->telegramApiUrl . 'sendMessage', [
                                 'parse_mode' => 'HTML',
                                 'chat_id' => $admin->chat_id,
-                                'text' => "
-                                    'name' => $user->name\n'email' => $user->email\n
-                                ",
+                                'text' => "$user->name\n$user->email\n",
                                 'reply_markup' => json_encode([
                                     'inline_keyboard' => [
                                         [
@@ -289,283 +340,281 @@ class TelegramRegistrationConstroller extends Controller
 
 
 
-    public function handleWebhook(Request $request)
-    {
-        $update = $request->all();
+    // public function handleWebhook(Request $request)
+    // {
+    //     $update = $request->all();
 
-        // Check if the update contains a message
-        if (isset($update['message'])) {
-            $this->handleMessage($update['message']);
-        }
+    //     // Check if the update contains a message
+    //     if (isset($update['message'])) {
+    //         $this->handleMessage($update['message']);
+    //     }
 
-        // Check if the update contains a callback query
-        if (isset($update['callback_query'])) {
-            $this->handleCallbackQuery($update['callback_query']);
-        }
+    //     // Check if the update contains a callback query
+    //     if (isset($update['callback_query'])) {
+    //         $this->handleCallbackQuery($update['callback_query']);
+    //     }
 
-        return response()->json(['status' => 'ok']);
-    }
+    //     return response()->json(['status' => 'ok']);
+    // }
 
     // Handle a message
-    private function handleMessage($message)
-    {
-        $chatId = $message['chat']['id'];
-        $text = $message['text'];
+    // private function handleMessage($message)
+    // {
+    //     $chatId = $message['chat']['id'];
+    //     $text = $message['text'];
 
-        if ($text === '/register') {
-            $employeeName = $message['from']['first_name'];
-            $admins = [12345678, 87654321]; // Replace with admin IDs
+    //     if ($text === '/register') {
+    //         $employeeName = $message['from']['first_name'];
+    //         $admins = [12345678, 87654321]; // Replace with admin IDs
 
-            foreach ($admins as $adminId) {
-                $keyboard = [
-                    'inline_keyboard' => [
-                        [
-                            ['text' => 'Approve', 'callback_data' => "approve:$chatId"],
-                            ['text' => 'Reject', 'callback_data' => "reject:$chatId"],
-                        ],
-                    ],
-                ];
+    //         foreach ($admins as $adminId) {
+    //             $keyboard = [
+    //                 'inline_keyboard' => [
+    //                     [
+    //                         ['text' => 'Approve', 'callback_data' => "approve:$chatId"],
+    //                         ['text' => 'Reject', 'callback_data' => "reject:$chatId"],
+    //                     ],
+    //                 ],
+    //             ];
 
-                $this->sendMessageTo($adminId, "New employee request:\nName: $employeeName", $keyboard);
-            }
-        }
-    }
+    //             $this->sendMessageTo($adminId, "New employee request:\nName: $employeeName", $keyboard);
+    //         }
+    //     }
+    // }
 
     // Handle a callback query
-    private function handleCallbackQuery($callbackQuery)
-    {
-        $data = $callbackQuery['data'];
-        $callbackId = $callbackQuery['id'];
+    // private function handleCallbackQuery($callbackQuery)
+    // {
+    //     $data = $callbackQuery['data'];
+    //     $callbackId = $callbackQuery['id'];
 
-        list($action, $employeeChatId) = explode(':', $data);
+    //     list($action, $employeeChatId) = explode(':', $data);
 
-        if ($action === 'approve') {
-            $this->sendMessageTo($employeeChatId, "Your registration has been approved!");
-            $this->answerCallbackQuery($callbackId, "Employee approved!");
-        } elseif ($action === 'reject') {
-            $this->sendMessageTo($employeeChatId, "Your registration has been rejected.");
-            $this->answerCallbackQuery($callbackId, "Employee rejected!");
-        }
-    }
+    //     if ($action === 'approve') {
+    //         $this->sendMessageTo($employeeChatId, "Your registration has been approved!");
+    //         $this->answerCallbackQuery($callbackId, "Employee approved!");
+    //     } elseif ($action === 'reject') {
+    //         $this->sendMessageTo($employeeChatId, "Your registration has been rejected.");
+    //         $this->answerCallbackQuery($callbackId, "Employee rejected!");
+    //     }
+    // }
 
     // Send a message to a chat
-    private function sendMessageTo($chatId, $text, $keyboard = null)
-    {
-        $url = $this->telegramApiUrl . 'sendMessage';
-        $data = [
-            'chat_id' => $chatId,
-            'text' => $text,
-            'reply_markup' => $keyboard ? json_encode($keyboard) : null,
-        ];
+    // private function sendMessageTo($chatId, $text, $keyboard = null)
+    // {
+    //     $url = $this->telegramApiUrl . 'sendMessage';
+    //     $data = [
+    //         'chat_id' => $chatId,
+    //         'text' => $text,
+    //         'reply_markup' => $keyboard ? json_encode($keyboard) : null,
+    //     ];
 
-        $this->sendRequest($url, $data);
-    }
+    //     $this->sendRequest($url, $data);
+    // }
 
     // Respond to a callback query
-    private function answerCallbackQuery($callbackQueryId, $text)
-    {
-        $url = $this->telegramApiUrl . 'answerCallbackQuery';
-        $data = [
-            'callback_query_id' => $callbackQueryId,
-            'text' => $text,
-        ];
+    // private function answerCallbackQuery($callbackQueryId, $text)
+    // {
+    //     $url = $this->telegramApiUrl . 'answerCallbackQuery';
+    //     $data = [
+    //         'callback_query_id' => $callbackQueryId,
+    //         'text' => $text,
+    //     ];
 
-        $this->sendRequest($url, $data);
-    }
+    //     $this->sendRequest($url, $data);
+    // }
 
     // Send a POST request to the Telegram API
-    private function sendRequest($url, $data)
-    {
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_POST, true);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    // private function sendRequest($url, $data)
+    // {
+    //     $curl = curl_init();
+    //     curl_setopt($curl, CURLOPT_URL, $url);
+    //     curl_setopt($curl, CURLOPT_POST, true);
+    //     curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+    //     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 
-        $response = curl_exec($curl);
-        curl_close($curl);
+    //     $response = curl_exec($curl);
+    //     curl_close($curl);
 
-        return json_decode($response, true);
-    }
+    //     return json_decode($response, true);
+    // }
 
+    // public function store(int $chatId, string $text, $replyMarkup = null)
+    // {
+    //     $token = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN');
+    //     $payload = [
+    //         'chat_id' => $chatId,
+    //         'text' => $text,
+    //         'parse_mode' => 'HTML',
+    //     ];
 
+    //     if ($replyMarkup) {
+    //         $payload['reply_markup'] = json_encode($replyMarkup);
+    //     }
 
-    public function store(int $chatId, string $text, $replyMarkup = null)
-    {
-        $token = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN');
-        $payload = [
-            'chat_id' => $chatId,
-            'text' => $text,
-            'parse_mode' => 'HTML',
-        ];
+    //     Http::post($token . '/sendMessage', $payload);
+    // }
 
-        if ($replyMarkup) {
-            $payload['reply_markup'] = json_encode($replyMarkup);
-        }
+    // public function bot(Request $request)
+    // {
+    //     try {
+    //         $data = $request->all();
+    //         $chat_id = $data['message']['chat']['id'];
+    //         $text = $data['message']['text'] ?? null;
+    //         $photo = $data['message']['photo'] ?? null;
 
-        Http::post($token . '/sendMessage', $payload);
-    }
+    //         if ($text === '/start') {
+    //             $this->store($chat_id, "Assalomu alaykum! Iltimos, tanlang:", [
+    //                 'keyboard' => [
+    //                     [
+    //                         ['text' => 'Register'],
+    //                         ['text' => 'Login']
+    //                     ]
+    //                 ],
+    //                 'resize_keyboard' => true,
+    //                 'one_time_keyboard' => true,
+    //             ]);
+    //             return;
+    //         }
 
-    public function bot(Request $request)
-    {
-        try {
-            $data = $request->all();
-            $chat_id = $data['message']['chat']['id'];
-            $text = $data['message']['text'] ?? null;
-            $photo = $data['message']['photo'] ?? null;
+    //         if ($text === 'Register') {
+    //             Cache::put("register_step_{$chat_id}", 'name');
+    //             $this->store($chat_id, "Iltimos, ismingizni kiriting:");
+    //             return;
+    //         }
 
-            if ($text === '/start') {
-                $this->store($chat_id, "Assalomu alaykum! Iltimos, tanlang:", [
-                    'keyboard' => [
-                        [
-                            ['text' => 'Register'],
-                            ['text' => 'Login']
-                        ]
-                    ],
-                    'resize_keyboard' => true,
-                    'one_time_keyboard' => true,
-                ]);
-                return;
-            }
+    //         if (Cache::get("register_step_{$chat_id}") === 'name') {
+    //             Cache::put("register_name_{$chat_id}", $text);
+    //             Cache::put("register_step_{$chat_id}", 'email');
+    //             $this->store($chat_id, "Iltimos, elektron pochta manzilingizni kiriting:");
+    //             return;
+    //         }
 
-            if ($text === 'Register') {
-                Cache::put("register_step_{$chat_id}", 'name');
-                $this->store($chat_id, "Iltimos, ismingizni kiriting:");
-                return;
-            }
+    //         if (Cache::get("register_step_{$chat_id}") === 'email') {
+    //             Cache::put("register_email_{$chat_id}", $text);
+    //             Cache::put("register_step_{$chat_id}", 'password');
+    //             $this->store($chat_id, "Iltimos, parolingizni kiriting:");
+    //             return;
+    //         }
 
-            if (Cache::get("register_step_{$chat_id}") === 'name') {
-                Cache::put("register_name_{$chat_id}", $text);
-                Cache::put("register_step_{$chat_id}", 'email');
-                $this->store($chat_id, "Iltimos, elektron pochta manzilingizni kiriting:");
-                return;
-            }
+    //         if (Cache::get("register_step_{$chat_id}") === 'password') {
+    //             Cache::put("register_password_{$chat_id}", $text);
+    //             Cache::put("register_step_{$chat_id}", 'confirmation_code');
 
-            if (Cache::get("register_step_{$chat_id}") === 'email') {
-                Cache::put("register_email_{$chat_id}", $text);
-                Cache::put("register_step_{$chat_id}", 'password');
-                $this->store($chat_id, "Iltimos, parolingizni kiriting:");
-                return;
-            }
+    //             // $confirmation_code = Str::random(6);
 
-            if (Cache::get("register_step_{$chat_id}") === 'password') {
-                Cache::put("register_password_{$chat_id}", $text);
-                Cache::put("register_step_{$chat_id}", 'confirmation_code');
+    //             $email = Cache::get("register_email_{$chat_id}");
+    //             $name = Cache::get("register_name_{$chat_id}");
 
-                // $confirmation_code = Str::random(6);
+    //             try {
+    //                 // Mail::to($email)->send(new SendMessage($name, $confirmation_code));
+    //                 Log::info('Email sent successfully');
+    //                 $this->store($chat_id, "Emailizga tasdiqlash kodi yuborildi. Iltimos, uni kiriting.");
+    //             } catch (\Exception $e) {
+    //                 Log::error('Email sending failed: ' . $e->getMessage());
+    //                 $this->store($chat_id, "Tasdiqlash kodi yuborishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+    //             }
 
-                $email = Cache::get("register_email_{$chat_id}");
-                $name = Cache::get("register_name_{$chat_id}");
+    //             // Cache::put("confirmation_code_{$chat_id}", $confirmation_code);
+    //             return;
+    //         }
+    //         if (Cache::get("register_step_{$chat_id}") === 'confirmation_code') {
+    //             if ($text === Cache::get("confirmation_code_{$chat_id}")) {
+    //                 Cache::put("register_password_{$chat_id}", bcrypt(Cache::get("register_password_{$chat_id}")));
+    //                 Cache::put("register_step_{$chat_id}", 'image');
+    //                 $this->store($chat_id, "Tasdiqlash kodi to'g'ri. Iltimos, profilingiz uchun rasm yuboring.");
+    //                 Cache::forget("confirmation_code_{$chat_id}");
+    //             } else {
+    //                 $this->store($chat_id, "Tasdiqlash kodi noto'g'ri. Iltimos, to'g'ri kodi kiriting.");
+    //             }
+    //             return;
+    //         }
 
-                try {
-                    // Mail::to($email)->send(new SendMessage($name, $confirmation_code));
-                    Log::info('Email sent successfully');
-                    $this->store($chat_id, "Emailizga tasdiqlash kodi yuborildi. Iltimos, uni kiriting.");
-                } catch (\Exception $e) {
-                    Log::error('Email sending failed: ' . $e->getMessage());
-                    $this->store($chat_id, "Tasdiqlash kodi yuborishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
-                }
+    //         if (Cache::get("register_step_{$chat_id}") === 'image') {
+    //             if ($photo) {
+    //                 $file_id = end($photo)['file_id'];
 
-                // Cache::put("confirmation_code_{$chat_id}", $confirmation_code);
-                return;
-            }
-            if (Cache::get("register_step_{$chat_id}") === 'confirmation_code') {
-                if ($text === Cache::get("confirmation_code_{$chat_id}")) {
-                    Cache::put("register_password_{$chat_id}", bcrypt(Cache::get("register_password_{$chat_id}")));
-                    Cache::put("register_step_{$chat_id}", 'image');
-                    $this->store($chat_id, "Tasdiqlash kodi to'g'ri. Iltimos, profilingiz uchun rasm yuboring.");
-                    Cache::forget("confirmation_code_{$chat_id}");
-                } else {
-                    $this->store($chat_id, "Tasdiqlash kodi noto'g'ri. Iltimos, to'g'ri kodi kiriting.");
-                }
-                return;
-            }
+    //                 $telegram_api = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN');
+    //                 $file_path_response = file_get_contents("{$telegram_api}/getFile?file_id={$file_id}");
+    //                 $response = json_decode($file_path_response, true);
 
-            if (Cache::get("register_step_{$chat_id}") === 'image') {
-                if ($photo) {
-                    $file_id = end($photo)['file_id'];
+    //                 if (isset($response['result']['file_path'])) {
+    //                     $file_path = $response['result']['file_path'];
+    //                     $download_url = "https://api.telegram.org/file/bot" . env('TELEGRAM_BOT_TOKEN') . "/{$file_path}";
 
-                    $telegram_api = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN');
-                    $file_path_response = file_get_contents("{$telegram_api}/getFile?file_id={$file_id}");
-                    $response = json_decode($file_path_response, true);
+    //                     $image_name = uniqid() . '.jpg';
+    //                     $image_content = file_get_contents($download_url);
 
-                    if (isset($response['result']['file_path'])) {
-                        $file_path = $response['result']['file_path'];
-                        $download_url = "https://api.telegram.org/file/bot" . env('TELEGRAM_BOT_TOKEN') . "/{$file_path}";
+    //                     if ($image_content) {
+    //                         Storage::disk('public')->put("uploads/{$image_name}", $image_content);
+    //                         $image_path = "uploads/{$image_name}";
+    //                     } else {
+    //                         $this->store($chat_id, "Rasmni yuklab olishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+    //                         return;
+    //                     }
+    //                     $user = User::create([
+    //                         'name' => Cache::get("register_name_{$chat_id}"),
+    //                         'email' => Cache::get("register_email_{$chat_id}"),
+    //                         'password' => Cache::get("register_password_{$chat_id}"),
+    //                         'chat_id' => $chat_id,
+    //                         'image' => "uploads/{$image_name}",
+    //                         'email_verified_at' => now(),
+    //                     ]);
 
-                        $image_name = uniqid() . '.jpg';
-                        $image_content = file_get_contents($download_url);
+    //                     Http::post(env('TELEGRAM_BOT_TOKEN') . '/sendMessage', [
+    //                         'chat_id' => User::where('role', 'admin')->first()->chat_id,
+    //                         'text' => $user,
+    //                         'parse_mode' => 'HTML',
+    //                         'reply_markup' => json_encode([
+    //                             'keyboard' => [
+    //                                 [
+    //                                     ['text' => 'Tasdiqlash✅'],
+    //                                     ['text' => 'Bekor qilish⛔️'],
+    //                                 ]
+    //                             ],
+    //                             'resize_keyboard' => true,
+    //                             'one_time_keyboard' => true,
+    //                         ]),
+    //                     ]);
 
-                        if ($image_content) {
-                            Storage::disk('public')->put("uploads/{$image_name}", $image_content);
-                            $image_path = "uploads/{$image_name}";
-                        } else {
-                            $this->store($chat_id, "Rasmni yuklab olishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
-                            return;
-                        }
-                        $user = User::create([
-                            'name' => Cache::get("register_name_{$chat_id}"),
-                            'email' => Cache::get("register_email_{$chat_id}"),
-                            'password' => Cache::get("register_password_{$chat_id}"),
-                            'chat_id' => $chat_id,
-                            'image' => "uploads/{$image_name}",
-                            'email_verified_at' => now(),
-                        ]);
-
-                        Http::post(env('TELEGRAM_BOT_TOKEN') . '/sendMessage', [
-                            'chat_id' => User::where('role', 'admin')->first()->chat_id,
-                            'text' => $user,
-                            'parse_mode' => 'HTML',
-                            'reply_markup' => json_encode([
-                                'keyboard' => [
-                                    [
-                                        ['text' => 'Tasdiqlash✅'],
-                                        ['text' => 'Bekor qilish⛔️'],
-                                    ]
-                                ],
-                                'resize_keyboard' => true,
-                                'one_time_keyboard' => true,
-                            ]),
-                        ]);
-
-                        $this->store($chat_id, "Siz muvaffaqiyatli ro'yxatdan o'tdingiz!");
+    //                     $this->store($chat_id, "Siz muvaffaqiyatli ro'yxatdan o'tdingiz!");
 
 
-                        Cache::forget("register_step_{$chat_id}");
-                        Cache::forget("register_name_{$chat_id}");
-                        Cache::forget("register_email_{$chat_id}");
-                        Cache::forget("register_password_{$chat_id}");
-                        Cache::forget("confirmation_code_{$chat_id}");
-                    } else {
-                        $this->store($chat_id, "Rasmni yuklab olishda muammo yuz berdi. Iltimos, qaytadan urinib ko'ring.");
-                    }
-                } else {
-                    $this->store($chat_id, "Iltimos, rasm yuboring!");
-                }
-                return;
-            }
-            if ($text === 'Tasdiqlash✅') {
-                Log::info('keldi');
-                $user = User::latest()->first()->update([
-                    'status' => '1',
-                ]);
-                $this->store(User::where('role', 'admin')->first()->chat_id, "Yangi user ro'yxatdan to'liq o'tdi!");
-                Log::info($user);
-            }
+    //                     Cache::forget("register_step_{$chat_id}");
+    //                     Cache::forget("register_name_{$chat_id}");
+    //                     Cache::forget("register_email_{$chat_id}");
+    //                     Cache::forget("register_password_{$chat_id}");
+    //                     Cache::forget("confirmation_code_{$chat_id}");
+    //                 } else {
+    //                     $this->store($chat_id, "Rasmni yuklab olishda muammo yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+    //                 }
+    //             } else {
+    //                 $this->store($chat_id, "Iltimos, rasm yuboring!");
+    //             }
+    //             return;
+    //         }
+    //         if ($text === 'Tasdiqlash✅') {
+    //             Log::info('keldi');
+    //             $user = User::latest()->first()->update([
+    //                 'status' => '1',
+    //             ]);
+    //             $this->store(User::where('role', 'admin')->first()->chat_id, "Yangi user ro'yxatdan to'liq o'tdi!");
+    //             Log::info($user);
+    //         }
 
-            if ($text === 'Bekor qilish⛔️') {
-                $user = User::latest()->first()->update([
-                    'status' => '0',
-                ]);
-                $this->store(User::where('role', 'admin')->first()->chat_id, "Yangi user to'liq o'tmadi");
-                Log::info($user);
-            }
-        } catch (\Exception $exception) {
-            Log::error($exception);
-            return response()->json([
-                'status' => 'error',
-                'message' => $exception->getMessage()
-            ]);
-        }
-    }
+    //         if ($text === 'Bekor qilish⛔️') {
+    //             $user = User::latest()->first()->update([
+    //                 'status' => '0',
+    //             ]);
+    //             $this->store(User::where('role', 'admin')->first()->chat_id, "Yangi user to'liq o'tmadi");
+    //             Log::info($user);
+    //         }
+    //     } catch (\Exception $exception) {
+    //         Log::error($exception);
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => $exception->getMessage()
+    //         ]);
+    //     }
+    // }
 }
