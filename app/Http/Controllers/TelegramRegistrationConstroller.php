@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendVerificationCode;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -27,12 +28,14 @@ class TelegramRegistrationConstroller extends Controller
 
     public function handle(Request $request)
     {
-        Log::info($request->all());
         $update = $request->all();
         $chatId = $update['message']['chat']['id'] ?? null;
         $text = $update['message']['text'] ?? null;
-        
-        if (isset($update['message']['photo'])) {
+
+        $step = cache()->get("registration_step_{$chatId}", 'start');
+
+        if (isset($update['message']['photo']) && $step == 'image') {
+            Log::info([$update, $step]);
             $photoArr = end($update['message']['photo']) ?? null;
             $photoInfo = $this->getFile($photoArr['file_id']);
             $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$photoInfo['result']['file_path']}";
@@ -40,15 +43,31 @@ class TelegramRegistrationConstroller extends Controller
             $photoPath = public_path("images/{$uniqId}.jpg");
             $fileContent = file_get_contents($fileUrl);
             file_put_contents($photoPath, $fileContent);
+            $this->sendMessage($chatId, "Please, enter the verification code!");
+
+            cache()->put("registration_step_{$chatId}", 'email_verification');
+
+            $rand = rand(10000, 100000);
+            cache()->put("email_virification_code_{$chatId}", $rand);
+
+            $name = cache()->get("user_name_{$chatId}");
+            $email = cache()->get("user_email_{$chatId}");
+            $password = cache()->get("user_password_{$chatId}");
+
+            SendVerificationCode::dispatch($email, $rand);
+
+            User::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make($password),
+                'image' => $photoPath,
+                'chat_id' => $chatId
+            ]);
         }
-
-
-
 
         if (!$chatId || !$text) {
             return response()->json(['status' => 'ignored']);
         }
-        $step = cache()->get("registration_step_{$chatId}", 'start');
 
         switch ($step) {
             case 'start':
@@ -78,58 +97,89 @@ class TelegramRegistrationConstroller extends Controller
                 cache()->put("registration_step_{$chatId}", 'image');
                 break;
 
-            case 'image':
+                // case 'image':
 
-                if (!isset($update['message']['photo']) || empty($update['message']['photo'])) {
-                    $this->sendMessage($chatId, "Please send a valid photo.");
+                //     if (isset($update['message']['photo'])) {
+
+                //         Log::info([$update, $step]);
+
+                //         $photoArr = end($update['message']['photo']) ?? null;
+                //         $photoInfo = $this->getFile($photoArr['file_id']);
+                //         $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$photoInfo['result']['file_path']}";
+                //         $uniqId = uniqid();
+                //         $photoPath = public_path("images/{$uniqId}.jpg");
+                //         $fileContent = file_get_contents($fileUrl);
+                //         file_put_contents($photoPath, $fileContent);
+                //     } else {
+                //         $this->sendMessage($chatId, "Please send a valid photo.");
+                //         break;
+                //     }
+
+
+                // if (!isset($update['message']['photo']) || empty($update['message']['photo'])) {
+                //     $this->sendMessage($chatId, "Please send a valid photo.");
+                //     break;
+                // }
+
+                // $photo = end($update['message']['photo']);
+                // $fileId = $photo['file_id'];
+                // $fileInfo = $this->getFile($fileId);
+
+                // // Log::info([$photo, 'FileInfo']);
+
+                // if (!$fileInfo || !isset($fileInfo['result']['file_path'])) {
+                //     $this->sendMessage($chatId, "Failed to retrieve file information. Please try again.");
+                //     break;
+                // }
+
+                // $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$fileInfo['result']['file_path']}";
+
+                // $photoPath = public_path("profile_pictures/{$chatId}.jpg");
+
+                // if (!file_exists(public_path('profile_pictures'))) {
+                //     mkdir(public_path('profile_pictures'), 0777, true);
+                // }
+
+                // $fileContent = @file_get_contents($fileUrl);
+
+                // if (!$fileContent) {
+                //     $this->sendMessage($chatId, "Failed to download the photo. Please try again.");
+                //     break;
+                // }
+
+                // file_put_contents($photoPath, $fileContent);
+
+                // $name = cache()->get("user_name_{$chatId}");
+                // $email = cache()->get("user_email_{$chatId}");
+                // $password = cache()->get("user_password_{$chatId}");
+
+
+                // User::create([
+                //     'name' => $name,
+                //     'email' => $email,
+                //     'password' => Hash::make($password),
+                //     'photo' => $photoPath,
+                //     'chat_id' => $chatId
+                // ]);
+
+                // $this->sendMessage($chatId, "Registration complete!\nName: $name\nEmail: $email\nPhoto saved.");
+                // cache()->forget("registration_step_{$chatId}");
+                // break;
+
+            case 'email_verification':
+                $code = cache()->get("email_virification_code_{$chatId}");
+                if ($code == $text) {
+                    User::where('chat_id', $chatId)->update([
+                        'email_verified_at' => now("Y-m-d H:i:s")
+                    ]);
+                    $this->sendMessage($chatId, "Your ");
+                    cache()->forget("registration_step_{$chatId}");
+                } else {
+                    $this->sendMessage($chatId, "The code is not correct!");
                     break;
                 }
 
-                $photo = end($update['message']['photo']);
-                $fileId = $photo['file_id'];
-                $fileInfo = $this->getFile($fileId);
-
-                // Log::info([$photo, 'FileInfo']);
-
-                if (!$fileInfo || !isset($fileInfo['result']['file_path'])) {
-                    $this->sendMessage($chatId, "Failed to retrieve file information. Please try again.");
-                    break;
-                }
-
-                $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$fileInfo['result']['file_path']}";
-
-                $photoPath = public_path("profile_pictures/{$chatId}.jpg");
-
-                if (!file_exists(public_path('profile_pictures'))) {
-                    mkdir(public_path('profile_pictures'), 0777, true);
-                }
-
-                $fileContent = @file_get_contents($fileUrl);
-
-                if (!$fileContent) {
-                    $this->sendMessage($chatId, "Failed to download the photo. Please try again.");
-                    break;
-                }
-
-                file_put_contents($photoPath, $fileContent);
-
-                $name = cache()->get("user_name_{$chatId}");
-                $email = cache()->get("user_email_{$chatId}");
-                $password = cache()->get("user_password_{$chatId}");
-
-
-                User::create([
-                    'name' => $name,
-                    'email' => $email,
-                    'password' => Hash::make($password),
-                    'photo' => $photoPath,
-                    'chat_id' => $chatId
-                ]);
-
-                $this->sendMessage($chatId, "Registration complete!\nName: $name\nEmail: $email\nPhoto saved.");
-                cache()->forget("registration_step_{$chatId}");
                 break;
-
             default:
                 $this->sendMessage($chatId, "Unknown step. Type /start to begin again.");
                 cache()->forget("registration_step_{$chatId}");
