@@ -18,12 +18,12 @@ Route::get('/meal/create', [MealController::class, 'create'])->middleware(['auth
 Route::post('/meal/create', [MealController::class, 'store'])->middleware(['auth', 'verified'])->name('meal.store');
 
 
-Route::get('/meal/toCart/{meal}', [MealController::class, 'addToCart'])->middleware(['auth', 'verified'])->name('meal.addToCart');
-Route::get('/meal/cart', [MealController::class, 'cart'])->middleware(['auth', 'verified'])->name('meal.cart');
-Route::get('/cart/remove', [MealController::class, 'cart'])->middleware(['auth', 'verified'])->name('cart.remove');
-Route::post('/cart/clear', [MealController::class, 'clearCart'])->middleware(['auth', 'verified'])->name('cart.clear');
-Route::post('/cart/update', [MealController::class, 'update'])->middleware(['auth', 'verified'])->name('cart.update');
-Route::post('/cart/placeOrder', [MealController::class, 'clearCart'])->middleware(['auth', 'verified'])->name('cart.placeOrder');
+Route::get('/meal-toCart/{meal}', [MealController::class, 'addToCart'])->middleware(['auth', 'verified'])->name('meal.addToCart');
+Route::get('/meal-cart', [MealController::class, 'cart'])->middleware(['auth', 'verified'])->name('meal.cart');
+Route::post('/cart-remove', [MealController::class, 'remove'])->middleware(['auth', 'verified'])->name('cart.remove');
+Route::post('/cart-clear', [MealController::class, 'clearCart'])->middleware(['auth', 'verified'])->name('cart.clear');
+Route::post('/cart-update', [MealController::class, 'update'])->middleware(['auth', 'verified'])->name('cart.update');
+Route::post('/cart-placeOrder', [MealController::class, 'clearCart'])->middleware(['auth', 'verified'])->name('cart.placeOrder');
 
 
 Route::middleware('auth')->group(function () {

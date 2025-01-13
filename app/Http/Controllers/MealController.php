@@ -73,7 +73,7 @@ class MealController extends Controller
 
     public function update(Request $request)
     {
-        $quantities = $request->input('quantities', []);
+        $quantities = $request->input('quantity', []);
 
         $cart = $request->session()->get('cart', []);
 
@@ -92,11 +92,16 @@ class MealController extends Controller
     {
         $mealId = $request->input('meal_id');
 
+        
         $cart = $request->session()->get('cart', []);
-
+        
+        dd($cart);
         unset($cart[$mealId]);
-
-        $request->session()->put('cart', $cart);
+        if (count($cart)) {
+            $request->session()->put('cart', $cart);
+        } else {
+            session()->get('cart', []);
+        }
 
         return redirect()->route('meal.cart')->with('success', 'Item removed from the cart.');
     }
