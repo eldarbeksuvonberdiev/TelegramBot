@@ -63,7 +63,6 @@ class TelegramRegistrationConstroller extends Controller
                         break;
                 }
             } else {
-                // Log::info("'elsedaman'");
                 Http::post($this->telegramApiUrl . 'sendMessage', [
                     'chat_id' => $chatId,
                     'text' => 'Please choose an option below:',
@@ -236,16 +235,13 @@ class TelegramRegistrationConstroller extends Controller
                                 'parse_mode' => 'HTML',
                                 'chat_id' => $admin->chat_id,
                                 'text' => "
-                                    <pre>
-                                    'name' => $user->name,
-                                    'email' => $user->email
-                                    </pre>
+                                    'name' => $user->name\n'email' => $user->email\n
                                 ",
                                 'reply_markup' => json_encode([
-                                    'keyboard' => [
+                                    'inline_keyboard' => [
                                         [
-                                            ['text' => 'Accept ✅', 'callback_data' => "approve:$chatId"],
-                                            ['text' => 'Reject ⛔️', 'callback_data' => "approve:$chatId"],
+                                            ['text' => 'Accept ✅', 'callback_data' => "accept:{$chatId}"],
+                                            ['text' => 'Reject ❌', 'callback_data' => "reject:{$chatId}"],
                                         ]
                                     ],
                                     'resize_keyboard' => true,
