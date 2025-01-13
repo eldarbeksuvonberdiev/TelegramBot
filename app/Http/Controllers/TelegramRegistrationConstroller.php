@@ -65,19 +65,22 @@ class TelegramRegistrationConstroller extends Controller
 
         if (isset($userOnRequest) && $userOnRequest->role == 'admin') {
 
-            Log::info([$update, $chatId]);
+            if (isset($update['callback_query'])) {
 
-            if (isset($update['callbeck_query'])) {
-                $callbackId = $update['callback_query']['id'];
-                list($action, $employeeChatId) = explode(':', $update['callback_query']);
-                if ($action === 'accept') {
-                    User::where('chat_id', $employeeChatId)->update('status', 1);
+                list($action, $employeeChatId) = explode(':', $update['callback_query']['data']);
+
+                Log::info([$action, $employeeChatId]);
+
+                if ($action == 'accept') {
+
+                    User::where('chat_id', $employeeChatId)->update(['status' => 1]);
+
                     $this->sendMessage($employeeChatId, "Your registration has been approved!");
-                    $this->answerCallbackQuery($callbackId, "Employee approved!");
-                } elseif ($action === 'reject') {
-                    User::where('chat_id', $employeeChatId)->update('status', 0);
+                } elseif ($action == 'reject') {
+
+                    User::where('chat_id', $employeeChatId)->update(['status' => 0]);
+
                     $this->sendMessage($employeeChatId, "Your registration has been rejected.");
-                    $this->answerCallbackQuery($callbackId, "Employee rejected!");
                 }
             } else {
                 if ($text == 'Active' || $text == 'Inactive') {
@@ -287,7 +290,7 @@ class TelegramRegistrationConstroller extends Controller
                             Http::post($this->telegramApiUrl . 'sendMessage', [
                                 'parse_mode' => 'HTML',
                                 'chat_id' => $admin->chat_id,
-                                'text' => "$user->name\n$user->email\n",
+                                'text' => "New user joinde:\n$user->name\n$user->email\n",
                                 'reply_markup' => json_encode([
                                     'inline_keyboard' => [
                                         [
@@ -336,6 +339,24 @@ class TelegramRegistrationConstroller extends Controller
         $response = Http::post($url, ['file_id' => $fileId]);
         return $response->json();
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
