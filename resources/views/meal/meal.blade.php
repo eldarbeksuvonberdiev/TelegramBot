@@ -14,8 +14,6 @@
                         <th>#</th>
                         <th>Name</th>
                         <th>Edit</th>
-                        <th>Delete</th>
-                        <th>Show</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -23,9 +21,9 @@
                         <tr>
                             <td>{{ $meal->id }}</td>
                             <td>{{ $meal->name }}</td>
-                            <td>Show</td>
-                            <td>Update</td>
-                            <td>Delete</td>
+                            <td>
+                                <a href="{{ route('meal.addToCart',$meal->id) }}" class="btn btn-outline-primary">To Cart <i class="bi bi-cart2"></i></a>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

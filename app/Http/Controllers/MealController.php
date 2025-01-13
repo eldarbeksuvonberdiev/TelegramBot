@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Meal;
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class MealController extends Controller
 {
@@ -14,7 +16,8 @@ class MealController extends Controller
     public function index()
     {
         $meals = Meal::all();
-        return view('meal.meal',compact('meals'));
+        $cart = session()->get('cart', []);
+        return view('meal.meal', compact('meals', 'cart'));
     }
 
     /**
@@ -37,35 +40,84 @@ class MealController extends Controller
         return redirect()->route('meal');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Meal $meal)
+    public function addToCart(Meal $meal)
     {
-        //
+        $cart = session()->get('cart', []);
+        if (isset($cart[$meal->id])) {
+
+            $cart[$meal->id]['quantity'] = $cart[$meal->id]['quantity'] + 1;
+        } else {
+
+            $cart[$meal->id] = [
+                'name' => $meal->name,
+                'quantity' => 1
+            ];
+        }
+        session()->put('cart', $cart);
+        return back();
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Meal $meal)
+    public function cart()
     {
-        //
+        $cart = session()->get('cart', []);
+
+        return view('meal.cart', compact('cart'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Meal $meal)
+    public function clearCart(Request $request)
     {
-        //
+        $request->session()->forget('cart');
+        return redirect()->route('meal')->with('success', 'Cart cleared successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Meal $meal)
+
+    public function update(Request $request)
     {
-        //
+        $quantities = $request->input('quantities', []);
+
+        $cart = $request->session()->get('cart', []);
+
+        foreach ($quantities as $mealId => $quantity) {
+            if (isset($cart[$mealId])) {
+                $cart[$mealId]['quantity'] = max(1, (int)$quantity);
+            }
+        }
+
+        $request->session()->put('cart', $cart);
+
+        return redirect()->route('meal.cart')->with('success', 'Cart updated successfully.');
+    }
+
+    public function remove(Request $request)
+    {
+        $mealId = $request->input('meal_id');
+
+        $cart = $request->session()->get('cart', []);
+
+        unset($cart[$mealId]);
+
+        $request->session()->put('cart', $cart);
+
+        return redirect()->route('meal.cart')->with('success', 'Item removed from the cart.');
+    }
+
+    public function placeOrder(Request $request)
+    {
+        $cart = $request->session()->get('cart', []);
+
+        if (empty($cart)) {
+            return redirect()->route('meal.cart')->with('error', 'Your cart is empty. Add items before placing an order.');
+        }
+
+        $order = Order::create([
+            'admin_id' => Auth::user()->id,
+            'deliver_id' => $request->deliver
+        ]);
+
+
+
+        $request->session()->forget('cart');
+
+        return redirect()->route('meal.cart')->with('success', 'Order placed successfully! Your order ID is #' . $order->id);
     }
 }
