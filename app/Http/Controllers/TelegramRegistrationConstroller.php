@@ -44,8 +44,7 @@ class TelegramRegistrationConstroller extends Controller
                             Http::post($this->telegramApiUrl . 'sendMessage', [
                                 'chat_id' => $chatId,
                                 'text' => "
-                                    $activeUser->name,
-                                    $activeUser->email,
+                                    {$activeUser->name}\n{$activeUser->email}\n
                                 "
                             ]);
                         }
@@ -57,8 +56,7 @@ class TelegramRegistrationConstroller extends Controller
                             Http::post($this->telegramApiUrl . 'sendMessage', [
                                 'chat_id' => $chatId,
                                 'text' => "
-                                    $inActiveUser->name,
-                                    $inActiveUser->email,
+                                    {$inActiveUser->name}\n{$inActiveUser->email}\n
                                 "
                             ]);
                         }
@@ -68,11 +66,12 @@ class TelegramRegistrationConstroller extends Controller
                 // Log::info("'elsedaman'");
                 Http::post($this->telegramApiUrl . 'sendMessage', [
                     'chat_id' => $chatId,
+                    'text' => 'Please choose an option below:',
                     'reply_markup' => json_encode([
                         'keyboard' => [
                             [
-                                ['text' => 'Active', 'callback_data' => "approve:$chatId"],
-                                ['text' => 'Inactive', 'callback_data' => "approve:$chatId"],
+                                ['text' => 'Active'],
+                                ['text' => 'Inactive'],
                             ]
                         ],
                         'resize_keyboard' => true,
