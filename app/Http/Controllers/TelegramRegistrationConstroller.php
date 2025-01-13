@@ -299,7 +299,7 @@ class TelegramRegistrationConstroller extends Controller
                                         ]
                                     ],
                                     'resize_keyboard' => true,
-                                    // 'one_time_keyboard' => true,
+                                    'one_time_keyboard' => true,
                                 ]),
                             ]);
                         }
