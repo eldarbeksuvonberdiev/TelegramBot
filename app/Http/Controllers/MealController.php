@@ -25,7 +25,8 @@ class MealController extends Controller
      */
     public function create()
     {
-        return view('meal.create');
+        $cart = session()->get('cart', []);
+        return view('meal.create', compact('cart'));
     }
 
     /**
@@ -88,22 +89,18 @@ class MealController extends Controller
         return redirect()->route('meal.cart')->with('success', 'Cart updated successfully.');
     }
 
-    public function remove(Request $request)
+    public function remove(Meal $meal)
     {
-        $mealId = $request->input('meal_id');
 
-        
-        $cart = $request->session()->get('cart', []);
-        
-        dd($cart);
-        unset($cart[$mealId]);
+        $cart = session()->get('cart', []);
+        unset($cart[$meal->id]);
         if (count($cart)) {
-            $request->session()->put('cart', $cart);
+            session()->put('cart', $cart);
         } else {
-            session()->get('cart', []);
+            session()->forget('cart');
         }
 
-        return redirect()->route('meal.cart')->with('success', 'Item removed from the cart.');
+        return back();
     }
 
     public function placeOrder(Request $request)

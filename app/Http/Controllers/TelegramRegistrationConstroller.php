@@ -53,6 +53,7 @@ class TelegramRegistrationConstroller extends Controller
 
     public function handle(Request $request)
     {
+        Log::info($request->all());
         $update = $request->all();
         if (isset($update['message']['chat']['id'])) {
             $chatId = $update['message']['chat']['id'] ?? null;
