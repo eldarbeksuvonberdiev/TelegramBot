@@ -63,7 +63,7 @@ class MealController extends Controller
     public function cart()
     {
         $cart = session()->get('cart', []);
-        $users = User::where('role','!=','admin')->get();
+        $users = User::where('role', '!=', 'admin')->get();
         return view('meal.cart', compact('cart', 'users'));
     }
 
@@ -107,6 +107,13 @@ class MealController extends Controller
 
     public function placeOrder(Request $request)
     {
+        $data = $request->validate([
+            'deliver' => 'required',
+            'dalivery_time' => 'required',
+            'longitude' => 'required',
+            'latitude' => 'required',
+        ]);
+
         $cart = $request->session()->get('cart', []);
 
         if (empty($cart)) {
@@ -115,8 +122,20 @@ class MealController extends Controller
 
         $order = Order::create([
             'admin_id' => Auth::user()->id,
-            'deliver_id' => $request->deliver
+            'deliver_id' => $data['deliver'],
+            'location' => json_encode([
+                'longitude' => $data['longitude'],
+                'latitude' => $data['latitude']
+            ]),
+
         ]);
+
+        foreach ($cart as $id => $meal) {
+            $order->orderItems->create([
+                'meal_id' => $id,
+                'quantity' => $cart[$id]['quantity'],
+            ]);
+        }
 
 
 

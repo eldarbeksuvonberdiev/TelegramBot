@@ -10,7 +10,6 @@ class OrderItem extends Model
         'order_id',
         'meal_id',
         'quantity',
-        'location',
     ];
 
     protected $casts = [

@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignId('meal_id')->constrained('meals')->cascadeOnDelete();
             $table->integer('quantity');
             $table->date('delivery_time');
-            $table->jsonb('location');
             $table->timestamps();
         });
     }
