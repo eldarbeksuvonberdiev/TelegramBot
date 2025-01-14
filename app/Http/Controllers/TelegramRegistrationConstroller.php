@@ -150,7 +150,7 @@ class TelegramRegistrationConstroller extends Controller
                 $fileContent = file_get_contents($fileUrl);
                 file_put_contents($photoPath, $fileContent);
 
-                cache()->put("photo_path_{$chatId}", "images/$uniqId");
+                cache()->put("photo_path_{$chatId}", "images/$uniqId.jpg");
 
                 $this->sendMessage($chatId, "Please, enter the verification code!");
 

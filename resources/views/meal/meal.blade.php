@@ -21,6 +21,7 @@
                         <tr>
                             <td>{{ $meal->id }}</td>
                             <td>{{ $meal->name }}</td>
+                            <td>{{ $meal->price }}</td>
                             <td>
                                 <a href="{{ route('meal.addToCart',$meal->id) }}" class="btn btn-outline-primary">To Cart <i class="bi bi-cart2"></i></a>
                             </td>

@@ -34,7 +34,14 @@
                             @endforeach
                         </tbody>
                     </table>
-
+                    <div class="mt-3">
+                        <label for="form-label" for="deliver"><strong>Choose a person to deliver the meals</strong></label>
+                        <select class="form-select" name="deliver_id" id="deliver" aria-label="Default select example">
+                            @foreach ($users as $user)
+                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <button type="submit"
                         style="margin-top: 15px; background: green; color: white; border: none; padding: 10px 20px; cursor: pointer;">Update
                         Cart</button>

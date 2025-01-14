@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Meal extends Model
 {
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'price'];
 
-    public function orderItem() 
+    public function orderItem()
     {
         return $this->hasMany(OrderItem::class, 'meal_id');
     }

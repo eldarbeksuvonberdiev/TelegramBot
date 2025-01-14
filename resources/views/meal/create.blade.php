@@ -12,6 +12,17 @@
             <form action="{{ route('meal.store') }}" method="post">
                 @csrf
                 <input type="text" name="name"class="form-control" placeholder="Meal name">
+                @error('name')
+                    <div class="text-danger">
+                        {{ $message }}
+                    </div>
+                @enderror
+                <input type="number" name="price"class="form-control mt-2" placeholder="Meal price">
+                @error('price')
+                    <div class="text-danger">
+                        {{ $message }}
+                    </div>
+                @enderror
                 <input type="submit"class="btn btn-primary mt-3" value="Store">
             </form>
         </div>

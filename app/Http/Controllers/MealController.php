@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Meal;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -35,7 +36,8 @@ class MealController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required'
+            'name' => 'required',
+            'price' => 'required|numeric',
         ]);
         Meal::create($data);
         return redirect()->route('meal');
@@ -61,8 +63,8 @@ class MealController extends Controller
     public function cart()
     {
         $cart = session()->get('cart', []);
-
-        return view('meal.cart', compact('cart'));
+        $users = User::where('role','!=','admin')->get();
+        return view('meal.cart', compact('cart', 'users'));
     }
 
     public function clearCart(Request $request)
