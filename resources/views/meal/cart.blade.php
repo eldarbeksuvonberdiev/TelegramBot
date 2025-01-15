@@ -54,19 +54,40 @@
                                 <option value="{{ $user->id }}">{{ $user->name }}</option>
                             @endforeach
                         </select>
+                        @error('deliver_id')
+                            <div class="text-danger">
+                                {{ $message }}
+                            </div>
+                        @enderror
                     </div>
 
-                    <input type="date" name="delivery_time" id="" class="form-control mt-3">
+                    <input type="date" name="delivery_time" class="form-control mt-3">
+                    @error('delivery_time')
+                        <div class="text-danger">
+                            {{ $message }}
+                        </div>
+                    @enderror
 
                     <input type="number" step="0.000001" name="latitude" placeholder="Location latitude"
                         class="form-control mt-3">
+                    @error('latitude')
+                        <div class="text-danger">
+                            {{ $message }}
+                        </div>
+                    @enderror
+
                     <input type="number" step="0.000001" name="longitude" placeholder="Location longitude"
                         class="form-control mt-3">
+                    @error('longitude')
+                        <div class="text-danger">
+                            {{ $message }}
+                        </div>
+                    @enderror
 
                     <button type="submit"
                         style="background: blue; color: white; border: none; padding: 10px 20px; cursor: pointer; margin-top:20px;">Place
                         Order</button><br>
-                    <span>Remember that, before placing the order you should update the order details by pushing the update
+                    <span class="text-danger">Remember that, before placing the order you should update the order details by pushing the update
                         cart button in case of change the count of the meals!</span>
                 </form>
 

@@ -8,9 +8,18 @@ use App\Models\Order;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 
 class MealController extends Controller
 {
+
+
+    private $telegramApiUrl;
+    public function __construct()
+    {
+        $this->telegramApiUrl = "https://api.telegram.org/bot" . env('TELEGRAM_BOT_TOKEN') . "/";
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -107,37 +116,58 @@ class MealController extends Controller
 
     public function placeOrder(Request $request)
     {
+        // dd($request->all());
         $data = $request->validate([
-            'deliver' => 'required',
-            'dalivery_time' => 'required',
+            'deliver_id' => 'required',
+            'delivery_time' => 'required',
             'longitude' => 'required',
             'latitude' => 'required',
         ]);
 
         $cart = $request->session()->get('cart', []);
-
         if (empty($cart)) {
             return redirect()->route('meal.cart')->with('error', 'Your cart is empty. Add items before placing an order.');
         }
 
         $order = Order::create([
             'admin_id' => Auth::user()->id,
-            'deliver_id' => $data['deliver'],
+            'deliver_id' => $data['deliver_id'],
             'location' => json_encode([
                 'longitude' => $data['longitude'],
                 'latitude' => $data['latitude']
             ]),
-
+            'delivery_time' => $data['delivery_time']
         ]);
 
+        $message = "";
         foreach ($cart as $id => $meal) {
-            $order->orderItems->create([
+            $meal = Meal::where('id', $id)->first();
+            $message = $message . "Nomi: " . $meal->name . "\nSoni: " . $cart[$id]['quantity'] . " ta";
+            $order->orderItems()->create([
                 'meal_id' => $id,
                 'quantity' => $cart[$id]['quantity'],
             ]);
         }
 
-
+        Http::post($this->telegramApiUrl . "sendMessage", [
+            "chat_id" => User::where('id', $data['deliver_id'])->first()->chat_id,
+            "text" => $message,
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => 'Accept ✅', 'callback_data' => "accept:{$order->id}"],
+                        ['text' => 'Reject ❌', 'callback_data' => "reject:{$order->id}"],
+                    ]
+                ],
+                'resize_keyboard' => true,
+                'one_time_keyboard' => true,
+            ]),
+        ]);
+        Http::post($this->telegramApiUrl . "sendLocation", [
+            "chat_id" => User::where('id', $data['deliver_id'])->first()->chat_id,
+            'latitude' => $data['latitude'],
+            'longitude' => $data['longitude'],
+        ]);
 
         $request->session()->forget('cart');
 
