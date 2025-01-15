@@ -39,9 +39,11 @@ window.Echo
         let buttonClass = window.orderData.status === 0 ? 'btn-danger' :
             window.orderData.status === 1 ? 'btn-primary' : 'btn-success';
 
+        let buttoMessage = window.orderData.status === 0 ? 'Rejected' : window.orderData.status === 1 ? 'Given' : 'Accepted';
+
         newMessage.innerHTML = `
             <button class="btn ${buttonClass}">
-                Status: ${window.orderData.status}
+                ${buttoMessage}
             </button>
         `;
         messageList.append(newMessage);
