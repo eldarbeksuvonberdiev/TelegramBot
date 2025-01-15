@@ -26,6 +26,9 @@
                         <li class="nav-item">
                             <a class="nav-link active" aria-current="page" href="{{ route('meal') }}" active>Meal</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" aria-current="page" href="{{ route('order') }}" active>Orders</a>
+                        </li>
                     </ul>
                     <a href="{{ route('meal.cart') }}" class="btn btn-success"><i
                             class="bi bi-cart3"></i>{{ count($cart) }}</a>

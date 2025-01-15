@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
-    protected $fillable = ['admin_id', 'deliver_id', 'location', 'delivery_time'];
+    protected $fillable = ['admin_id', 'deliver_id', 'location', 'delivery_time', 'status'];
+
+    // protected $casts = ['location' => 'array'];
 
     public function orderItems()
     {
@@ -20,6 +22,6 @@ class Order extends Model
 
     public function deliver()
     {
-        return $this->hasMany(OrderItem::class, 'deliver_id');
+        return $this->belongsTo(User::class, 'deliver_id');
     }
 }

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('deliver_id')->constrained('users')->cascadeOnDelete();
             $table->jsonb('location');
             $table->date('delivery_time');
+            $table->integer('status')->default(1);
             $table->timestamps();
         });
     }

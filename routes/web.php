@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\MealController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,7 @@ Route::post('/cart-clear', [MealController::class, 'clearCart'])->middleware(['a
 Route::post('/cart-update', [MealController::class, 'update'])->middleware(['auth', 'verified'])->name('cart.update');
 Route::post('/cart-placeOrder', [MealController::class, 'placeOrder'])->middleware(['auth', 'verified'])->name('cart.placeOrder');
 
+Route::get('/order', [OrderController::class, 'index'])->middleware(['auth', 'verified'])->name('order');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

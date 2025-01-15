@@ -68,16 +68,17 @@
                         </div>
                     @enderror
 
+                    <strong class="text-warning mt-2">Latitude(Kenglik)</strong>
                     <input type="number" step="0.000001" name="latitude" placeholder="Location latitude"
-                        class="form-control mt-3">
+                        class="form-control">
                     @error('latitude')
                         <div class="text-danger">
                             {{ $message }}
                         </div>
                     @enderror
-
+                    <strong class="text-warning mt-2">Longitude(Uzunlik)</strong>
                     <input type="number" step="0.000001" name="longitude" placeholder="Location longitude"
-                        class="form-control mt-3">
+                        class="form-control">
                     @error('longitude')
                         <div class="text-danger">
                             {{ $message }}
@@ -87,7 +88,8 @@
                     <button type="submit"
                         style="background: blue; color: white; border: none; padding: 10px 20px; cursor: pointer; margin-top:20px;">Place
                         Order</button><br>
-                    <span class="text-danger">Remember that, before placing the order you should update the order details by pushing the update
+                    <span class="text-danger">Remember that, before placing the order you should update the order details by
+                        pushing the update
                         cart button in case of change the count of the meals!</span>
                 </form>
 

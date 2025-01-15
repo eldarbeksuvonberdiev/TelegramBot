@@ -135,20 +135,20 @@ class MealController extends Controller
             'location' => json_encode([
                 'longitude' => $data['longitude'],
                 'latitude' => $data['latitude']
-            ]),
+            ], true),
             'delivery_time' => $data['delivery_time']
         ]);
 
         $message = "";
         foreach ($cart as $id => $meal) {
             $meal = Meal::where('id', $id)->first();
-            $message = $message . "Nomi: " . $meal->name . "\nSoni: " . $cart[$id]['quantity'] . " ta";
+            $message = $message . "Nomi: " . $meal->name . " Soni: " . $cart[$id]['quantity'] . " ta\n";
             $order->orderItems()->create([
                 'meal_id' => $id,
                 'quantity' => $cart[$id]['quantity'],
             ]);
         }
-
+        $message = $message . 'Yetkazib berish vaqti: ' . $data['delivery_time'];
         Http::post($this->telegramApiUrl . "sendMessage", [
             "chat_id" => User::where('id', $data['deliver_id'])->first()->chat_id,
             "text" => $message,
