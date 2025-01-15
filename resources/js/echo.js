@@ -13,6 +13,9 @@ window.Echo = new Echo({
     enabledTransports: ['ws', 'wss'],
 });
 
+
+
+
 window.orderData = {
     status: null,
 };
@@ -41,8 +44,6 @@ window.Echo
                 Status: ${window.orderData.status}
             </button>
         `;
-
-
         messageList.append(newMessage);
 
     });

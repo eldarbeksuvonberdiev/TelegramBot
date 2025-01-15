@@ -26,14 +26,22 @@
                             <td>{{ $order->delivery_time }}</td>
                             @php
                                 $locationData = json_decode($order->location, true);
-                                broadcast(new \App\Events\OrderStatusEvent($order->status));
-                                broadcast(new \App\Events\OrderIdEvent($order->id));
+                                $status = $order->status;
+                                // broadcast(new \App\Events\OrderStatusEvent($order->status));
+                                // broadcast(new \App\Events\OrderIdEvent($order->id));
                             @endphp
                             <td>
                                 Latitude: {{ $locationData['latitude'] }}<br>
                                 Longitude: {{ $locationData['longitude'] }}
                             </td>
                             <td id="statusOfOrder_{{ $order->id }}">
+                                @if ($status == 0)
+                                    <button class="btn btn-danger">Rejected</button>
+                                @elseif($status == 1)
+                                    <button class="btn btn-primary">Given</button>
+                                @elseif($status == 2)
+                                    <button class="btn btn-success">Given</button>
+                                @endif
                             </td>
                             <td>
                                 @foreach ($order->orderItems as $meal)

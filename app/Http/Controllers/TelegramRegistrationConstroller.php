@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderIdEvent;
+use App\Events\OrderStatusEvent;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendVerificationCode;
 use App\Models\Order;
@@ -146,7 +148,8 @@ class TelegramRegistrationConstroller extends Controller
 
                 if ($action == 'accept') {
 
-                    Order::where('id', $orderId)->update(['status' => 2]);
+                    $order = Order::where('id', $orderId)->first();
+                    $order->update(['status' => 2]);
 
                     $this->sendMessage($chatId, "You have accepted the order");
 
@@ -156,10 +159,26 @@ class TelegramRegistrationConstroller extends Controller
                         'remove_keyboard' => true
                     ]);
 
-                    // $this->sendMessage($chatId, $response);
+                    broadcast(new OrderStatusEvent('2'));
+                    broadcast(new OrderIdEvent($order->id));
+
+                    return; 
                 } elseif ($action == 'reject') {
 
-                    Order::where('id', $orderId)->update(['status' => 0]);
+                    $order = Order::where('id', $orderId)->first();
+                    $order->update(['status' => 0]);
+
+                    $this->sendMessage($chatId, "You have rejected the order");
+
+                    $response = Http::post($this->telegramApiUrl . "editMessageReplyMarkup", [
+                        "chat_id" => $chatId,
+                        "message_id" => $messageId,
+                        'remove_keyboard' => true
+                    ]);
+
+                    broadcast(new OrderStatusEvent('0'));
+                    broadcast(new OrderIdEvent($order->id));
+                    return;
                 }
             }
         }
