@@ -28,7 +28,7 @@
                                 $locationData = json_decode($order->location, true);
                             @endphp
                             <td>
-                                Latitude: {{ $locationData['latitude'] }}
+                                Latitude: {{ $locationData['latitude'] }}<br>
                                 Longitude: {{ $locationData['longitude'] }}
                             </td>
                             <td>{{ $order->status }}</td>

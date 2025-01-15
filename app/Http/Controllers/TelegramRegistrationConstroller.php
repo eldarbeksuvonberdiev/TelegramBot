@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendVerificationCode;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -133,6 +134,18 @@ class TelegramRegistrationConstroller extends Controller
                         ]),
                     ]);
                     return;
+                }
+            }
+        }
+
+        if (isset($userOnRequest) && $userOnRequest->role == 'user') {
+            if (isset($update['callback_query'])) {
+                list($action, $orderId) = explode(':', $update['callback_query']['data']);
+
+                if ($action == 'accept') {
+                    Order::where('id', $orderId)->update(['status' => 2]);
+                } elseif ($action == 'reject') {
+                    Order::where('id', $orderId)->update(['status' => 0]);
                 }
             }
         }
