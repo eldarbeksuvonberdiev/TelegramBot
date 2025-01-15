@@ -152,7 +152,7 @@ class MealController extends Controller
         Http::post($this->telegramApiUrl . "sendMessage", [
             "chat_id" => User::where('id', $data['deliver_id'])->first()->chat_id,
             "text" => $message,
-            'reply_markup' => json_encode([
+            'reply_markup' => [
                 'inline_keyboard' => [
                     [
                         ['text' => 'Accept ✅', 'callback_data' => "accept:{$order->id}"],
@@ -161,7 +161,7 @@ class MealController extends Controller
                 ],
                 'resize_keyboard' => true,
                 'one_time_keyboard' => true,
-            ]),
+            ],
         ]);
         Http::post($this->telegramApiUrl . "sendLocation", [
             "chat_id" => User::where('id', $data['deliver_id'])->first()->chat_id,

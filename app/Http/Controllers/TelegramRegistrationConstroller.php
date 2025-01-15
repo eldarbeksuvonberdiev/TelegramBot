@@ -140,11 +140,25 @@ class TelegramRegistrationConstroller extends Controller
 
         if (isset($userOnRequest) && $userOnRequest->role == 'user') {
             if (isset($update['callback_query'])) {
+
                 list($action, $orderId) = explode(':', $update['callback_query']['data']);
+                $messageId = $update['callback_query']['message']['message_id'];
 
                 if ($action == 'accept') {
+
                     Order::where('id', $orderId)->update(['status' => 2]);
+
+                    $this->sendMessage($chatId, "You have accepted the order");
+
+                    $response = Http::post($this->telegramApiUrl . "editMessageReplyMarkup", [
+                        "chat_id" => $chatId,
+                        "message_id" => $messageId,
+                        'remove_keyboard' => true
+                    ]);
+
+                    // $this->sendMessage($chatId, $response);
                 } elseif ($action == 'reject') {
+
                     Order::where('id', $orderId)->update(['status' => 0]);
                 }
             }

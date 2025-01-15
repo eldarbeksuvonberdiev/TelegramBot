@@ -17,9 +17,10 @@ class OrderStatusEvent implements ShouldBroadcast
     /**
      * Create a new event instance.
      */
-    public function __construct()
+    public $status;
+    public function __construct($status)
     {
-        //
+        $this->status = $status;
     }
 
     /**
@@ -30,8 +31,8 @@ class OrderStatusEvent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            // new PrivateChannel('channel-name'),
             new Channel('orderStatus')
+            // new PrivateChannel('channel-name'),
         ];
     }
 }

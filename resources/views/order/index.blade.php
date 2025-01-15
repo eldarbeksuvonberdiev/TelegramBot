@@ -26,12 +26,15 @@
                             <td>{{ $order->delivery_time }}</td>
                             @php
                                 $locationData = json_decode($order->location, true);
+                                broadcast(new \App\Events\OrderStatusEvent($order->status));
                             @endphp
                             <td>
                                 Latitude: {{ $locationData['latitude'] }}<br>
                                 Longitude: {{ $locationData['longitude'] }}
                             </td>
-                            <td>{{ $order->status }}</td>
+                            <td id="statusOfOrder">
+
+                            </td>
                             <td>
                                 @foreach ($order->orderItems as $meal)
                                     {{ 'Nomi: ' . $meal->meal->name . ', ' }}
