@@ -13,11 +13,40 @@ window.Echo = new Echo({
     enabledTransports: ['ws', 'wss'],
 });
 
-window.Echo.channel(`orderStatus`)
+window.orderData = {
+    status: null,
+};
+
+window.Echo
+    .channel('orderStatus')
     .listen('OrderStatusEvent', (e) => {
-        console.log('Received Event Data:', e);
-        const messageList = document.getElementById('newMessage');
+        // console.log('Status:', e.status);
+        window.orderData.status = e.status;
     });
+window.Echo
+    .channel('orderId')
+    .listen('OrderIdEvent', (e) => {
+        console.log('OrderId:', e.orderId);
+        const status = window.orderData.status;
+        const messageList = document.getElementById(`statusOfOrder_${e.orderId}`);
+        const newMessage = document.createElement('div');
+
+        messageList.innerHTML = '';
+
+        let buttonClass = window.orderData.status === 0 ? 'btn-danger' :
+            window.orderData.status === 1 ? 'btn-primary' : 'btn-success';
+
+        newMessage.innerHTML = `
+            <button class="btn ${buttonClass}">
+                Status: ${window.orderData.status}
+            </button>
+        `;
+
+
+        messageList.append(newMessage);
+
+    });
+
 // console.log('File URL:', e.file);
 
 // const messageList = document.getElementById('newMessage');

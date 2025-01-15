@@ -9,21 +9,18 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
-class OrderStatusEvent implements ShouldBroadcast
+class OrderIdEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public $orderId;
     /**
      * Create a new event instance.
      */
-    public $status;
-
-    public function __construct($status)
+    public function __construct($orderId)
     {
-
-        $this->status = $status;
+        $this->orderId = $orderId;
     }
 
     /**
@@ -34,9 +31,7 @@ class OrderStatusEvent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new Channel('orderStatus')
-            // new PrivateChannel('channel-name'),
+            new Channel('orderId'),
         ];
     }
-
 }

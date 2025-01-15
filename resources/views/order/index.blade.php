@@ -27,13 +27,13 @@
                             @php
                                 $locationData = json_decode($order->location, true);
                                 broadcast(new \App\Events\OrderStatusEvent($order->status));
+                                broadcast(new \App\Events\OrderIdEvent($order->id));
                             @endphp
                             <td>
                                 Latitude: {{ $locationData['latitude'] }}<br>
                                 Longitude: {{ $locationData['longitude'] }}
                             </td>
-                            <td id="statusOfOrder">
-
+                            <td id="statusOfOrder_{{ $order->id }}">
                             </td>
                             <td>
                                 @foreach ($order->orderItems as $meal)
