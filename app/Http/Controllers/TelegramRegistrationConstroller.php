@@ -184,6 +184,7 @@ class TelegramRegistrationConstroller extends Controller
         }
 
         if (!$userOnRequest) {
+            
             $step = cache()->get("registration_step_{$chatId}", 'start');
 
             if (isset($update['message']['photo']) && $step == 'image') {
